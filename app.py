@@ -172,10 +172,19 @@ def load_equipment_dict():
         print(f"Firebase設備辞書の読み込みエラー: {e}")
 
 
-reader = easyocr.Reader(
-    ['ja', 'en'],
-    gpu=False
-)
+# easyocr リーダーの遅延初期化（メモリ節約）
+reader = None
+
+def get_reader():
+    global reader
+    if reader is None:
+        reader = easyocr.Reader(
+            ['ja', 'en'],
+            gpu=False,
+            model_storage_directory=os.path.join(BASE_DIR, 'models'),
+            user_network_directory=os.path.join(BASE_DIR, 'models')
+        )
+    return reader
 
 # 起動時に辞書を読み込む
 load_equipment_dict()
@@ -520,7 +529,8 @@ def save_selection():
 
         crop_np = np.array(crop)
 
-        result = reader.readtext(
+        ocr_reader = get_reader()
+        result = ocr_reader.readtext(
             crop_np,
             detail=0
         )
@@ -589,7 +599,9 @@ def download_excel():
 
 
 if __name__ == "__main__":
-
+    port = int(os.environ.get("PORT", 5000))
     app.run(
-        debug=True
+        host="0.0.0.0",
+        port=port,
+        debug=False
     )
