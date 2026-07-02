@@ -1,0 +1,13 @@
+flask
+flask-cors
+requests
+firebase-admin
+pandas
+numpy
+gunicorn
+python-dotenv
+PyMuPDF
+easyocr
+Pillow
+openpyxl
+rapidfuzz

@@ -1,0 +1,151 @@
+﻿<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LOAD TABLE OCR</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+
+<body>
+    <div id="message"></div>
+
+    <div class="appShell">
+        <aside class="sidebar">
+            <div class="brand">
+                <div class="brandIcon">LOAD</div>
+                <div>
+                    <h1>LOAD TABLE OCR</h1>
+                    <p>建築事務所向けPDF OCR</p>
+                </div>
+            </div>
+            <nav class="sidebarNav">
+                <a class="navItem active">OCRを実行</a>
+                <a class="navItem">履歴一覧</a>
+                <a class="navItem">テンプレート管理</a>
+                <a class="navItem">設定</a>
+            </nav>
+            <div class="sidebarFooter">
+                <a class="footerLink">ヘルプ</a>
+                <a class="footerLink" href="{{ url_for('logout') }}">ログアウト</a>
+            </div>
+        </aside>
+
+        <main class="mainContent">
+            <section class="pageHeader">
+                <div>
+                    <p class="eyebrow">OCRを実行</p>
+                    <h2>PDFの負荷表をアップロードして、テキストを自動で読み取ります。</h2>
+                </div>
+                <div class="headerTag">{{ usr or 'ユーザー' }} でログイン中</div>
+            </section>
+
+            <section class="steps">
+                <div class="step active">
+                    <span>01</span>
+                    <p>アップロード</p>
+                </div>
+                <div class="step">
+                    <span>02</span>
+                    <p>OCR処理中</p>
+                </div>
+                <div class="step">
+                    <span>03</span>
+                    <p>解析結果</p>
+                </div>
+            </section>
+
+            <div class="dashboardGrid">
+                <section class="panel card uploadPanel">
+                    <div class="panelHeader">
+                        <div>
+                            <p class="panelLabel">01</p>
+                            <h3>アップロード</h3>
+                        </div>
+                    </div>
+                    <label class="dropzone" for="pdfFile">
+                        <div class="dropIcon">☁️</div>
+                        <strong>PDFファイルをドラッグ＆ドロップ</strong>
+                        <span>または</span>
+                        <button type="button" class="selectButton">ファイルを選択</button>
+                        <small>※ 最大100MBまで / 1ファイルずつアップロードしてください</small>
+                    </label>
+                    <input type="file" id="pdfFile" accept=".pdf">
+                    <div class="uploadedFile">
+                        <p>アップロードしたファイル</p>
+                        <div class="fileInfo">
+                            <span id="uploadedFileName">ファイルが選択されていません</span>
+                        </div>
+                    </div>
+                    <div class="settingsCard">
+                        <div class="settingsTitle">OCR設定（オプション）</div>
+                        <div class="settingsGrid">
+                            <label class="fieldGroup">
+                                <span>言語</span>
+                                <select>
+                                    <option>日本語</option>
+                                </select>
+                            </label>
+                            <label class="fieldGroup">
+                                <span>表の検出モード</span>
+                                <select>
+                                    <option>自動（推奨）</option>
+                                </select>
+                            </label>
+                            <label class="fieldGroup fullWidth">
+                                <span>行数</span>
+                                <input type="number" id="rowCount" value="20" min="1" max="500">
+                            </label>
+                        </div>
+                    </div>
+                    <button id="ocrButton" class="primaryButton">OCRを開始する</button>
+                </section>
+
+                <section class="panel card previewPanel">
+                    <div class="panelHeader">
+                        <div>
+                            <p class="panelLabel">02</p>
+                            <h3>プレビュー</h3>
+                        </div>
+                        <div class="previewControls">
+                            <button type="button" id="zoomOut" class="iconButton">−</button>
+                            <button type="button" id="zoomReset" class="iconButton">⤢</button>
+                            <button type="button" id="zoomIn" class="iconButton">＋</button>
+                        </div>
+                    </div>
+                    <div id="viewer" class="viewer">
+                        <div id="canvasContainer">
+                            <img id="pdfImage" alt="PDF preview">
+                            <canvas id="overlay"></canvas>
+                        </div>
+                    </div>
+                    <div id="pageNavigation" class="pageNavigation">
+                        <button type="button" id="prevPage" class="pageButton">← 前へ</button>
+                        <div class="pageInfo">
+                            <span id="currentPage">1</span>
+                            <span>/</span>
+                            <span id="totalPages">1</span>
+                        </div>
+                        <button type="button" id="nextPage" class="pageButton">次へ →</button>
+                    </div>
+                </section>
+            </div>
+
+            <section class="panel card statusPanel">
+                <div class="statusHeader">
+                    <div>
+                        <p class="panelLabel">03</p>
+                        <h4>OCR進捗</h4>
+                    </div>
+                    <span id="progressText">0%</span>
+                </div>
+                <progress id="progressBar" value="0" max="100"></progress>
+            </section>
+        </main>
+    </div>
+
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+
+</html>

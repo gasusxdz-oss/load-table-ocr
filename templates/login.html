@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ログイン | LOAD TABLE OCR</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <style>
+        body {
+            margin: 0;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(180deg, #f4f7fb 0%, #e8edf5 100%);
+            font-family: "Segoe UI", "Meiryo", sans-serif;
+        }
+
+        .loginCard {
+            width: min(92vw, 420px);
+            background: #fff;
+            border-radius: 24px;
+            box-shadow: 0 24px 60px rgba(15, 23, 42, 0.08);
+            padding: 32px;
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            margin-bottom: 24px;
+        }
+
+        .brandIcon {
+            width: 54px;
+            height: 54px;
+            border-radius: 16px;
+            display: grid;
+            place-items: center;
+            background: linear-gradient(135deg, #4f8cff, #2962ff);
+            color: #fff;
+            font-weight: 700;
+            letter-spacing: 0.05em;
+        }
+
+        .brand h1 {
+            margin: 0;
+            font-size: 20px;
+            color: #111418;
+        }
+
+        .brand p {
+            margin: 4px 0 0;
+            color: #64748b;
+            font-size: 14px;
+        }
+
+        form {
+            display: grid;
+            gap: 14px;
+        }
+
+        .fieldGroup {
+            display: grid;
+            gap: 8px;
+        }
+
+        .fieldGroup label {
+            font-size: 14px;
+            font-weight: 600;
+            color: #334155;
+        }
+
+        input {
+            width: 100%;
+            padding: 13px 15px;
+            border-radius: 14px;
+            border: 1px solid #d6dce5;
+            background: #fff;
+            color: #111418;
+            box-sizing: border-box;
+        }
+
+        input:focus {
+            outline: none;
+            border-color: #4f8cff;
+            box-shadow: 0 0 0 4px rgba(79, 140, 255, 0.12);
+        }
+
+        .primaryButton {
+            border: none;
+            border-radius: 14px;
+            padding: 13px 16px;
+            background: #111418;
+            color: #fff;
+            cursor: pointer;
+            font-weight: 700;
+        }
+
+        .primaryButton:hover {
+            background: #1f2937;
+        }
+
+        .msg {
+            margin-top: 14px;
+            padding: 12px 14px;
+            border-radius: 12px;
+            background: #eef5ff;
+            color: #2563eb;
+            font-size: 14px;
+        }
+
+        .hint {
+            margin-top: 10px;
+            font-size: 12px;
+            color: #64748b;
+        }
+    </style>
+</head>
+<body>
+    <div class="loginCard">
+        <div class="loginBrand">
+            <div class="loginBrandIcon">LOAD</div>
+            <div>
+                <h1>LOAD TABLE OCR</h1>
+                <p>Firebase ログイン</p>
+            </div>
+        </div>
+        <form class="loginForm" method="post" action="{{ url_for('login') }}">
+            <div class="loginField">
+                <label for="email">メールアドレス</label>
+                <input type="email" id="email" name="email" required placeholder="example@example.com">
+            </div>
+            <div class="loginField">
+                <label for="password">パスワード</label>
+                <input type="password" id="password" name="password" required placeholder="パスワード">
+            </div>
+            <button class="loginButton" type="submit">ログイン</button>
+        </form>
+        {% if msg %}
+            <div class="loginMessage">{{ msg }}</div>
+        {% endif %}
+        <div class="loginHint">Firebase Auth で作成したメールアドレスとパスワードを入力してください。</div>
+    </div>
+</body>
+</html>
