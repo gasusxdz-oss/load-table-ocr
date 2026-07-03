@@ -72,11 +72,16 @@ FIREBASE_CONFIG_PATH = os.getenv(
 FIREBASE_COLLECTION = os.getenv("FIREBASE_EQUIPMENT_COLLECTION", "equipment_dictionary").strip()
 FIREBASE_DOCUMENT = os.getenv("FIREBASE_EQUIPMENT_DOCUMENT", "main").strip()
 
-FIREBASE_API_KEY = ""
-FIREBASE_PROJECT_ID = ""
+FIREBASE_API_KEY = os.getenv("FIREBASE_API_KEY", "").strip()
+FIREBASE_PROJECT_ID = os.getenv("FIREBASE_PROJECT_ID", "").strip()
 FIREBASE_AUTH_URL = ""
 
-if os.path.exists(FIREBASE_CONFIG_PATH):
+if FIREBASE_API_KEY:
+    FIREBASE_AUTH_URL = (
+        f"https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key={FIREBASE_API_KEY}"
+    )
+
+if not FIREBASE_API_KEY and os.path.exists(FIREBASE_CONFIG_PATH):
     try:
         with open(FIREBASE_CONFIG_PATH, "r", encoding="utf-8") as f:
             fb_conf = json.load(f)
@@ -88,7 +93,7 @@ if os.path.exists(FIREBASE_CONFIG_PATH):
                 )
     except Exception as e:
         print(f"firebaseConfig.json の読み込みエラー: {e}")
-else:
+elif not FIREBASE_API_KEY:
     print(f"firebaseConfig.json が見つかりません: {FIREBASE_CONFIG_PATH}")
 
 # 設備辞書の読み込み
