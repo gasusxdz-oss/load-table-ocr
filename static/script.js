@@ -12,6 +12,8 @@ const viewer = document.getElementById("viewer");
 const message = document.getElementById("message");
 const progressBar = document.getElementById("progressBar");
 const progressText = document.getElementById("progressText");
+const downloadLinkContainer = document.getElementById("downloadLinkContainer");
+const downloadLink = document.getElementById("downloadLink");
 const prevPageButton = document.getElementById("prevPage");
 const nextPageButton = document.getElementById("nextPage");
 const currentPageSpan = document.getElementById("currentPage");
@@ -193,6 +195,8 @@ pdfFile.addEventListener("change", async () => {
     currentPageSpan.textContent = currentPage;
     totalPagesSpan.textContent = totalPages;
     updatePageButtonStates();
+    downloadLinkContainer.style.display = "none";
+    downloadLink.href = "#";
     
     image.src = data.image + "?" + Date.now();
 });
@@ -418,6 +422,8 @@ dropzone.addEventListener("drop", async (e) => {
     currentPageSpan.textContent = currentPage;
     totalPagesSpan.textContent = totalPages;
     updatePageButtonStates();
+    downloadLinkContainer.style.display = "none";
+    downloadLink.href = "#";
     
     image.src = data.image + "?" + Date.now();
 });
@@ -456,7 +462,8 @@ ocrButton.addEventListener("click", async () => {
     const data = await res.json();
     showMessage("OCRが完了しました。補正結果を確認してください。")
 
-    window.open(data.excel, "_blank");
+    downloadLink.href = data.excel;
+    downloadLinkContainer.style.display = "block";
 });
 
 // メッセージを表示する関数
