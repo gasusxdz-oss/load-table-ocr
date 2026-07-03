@@ -192,6 +192,32 @@ current_pdf_path = None
 current_pdf_page_count = 0
 current_pdf_page_number = 0
 progress = 0
+progress_logs = []
+
+
+def reset_progress_state():
+    global progress, progress_logs
+    progress = 0
+    progress_logs = []
+    try:
+        session["progress"] = 0
+        session["progress_logs"] = []
+    except Exception:
+        pass
+
+
+def update_progress_state(percent, message=None):
+    global progress, progress_logs
+    progress = int(percent)
+    if message:
+        progress_logs.append(message)
+        if len(progress_logs) > 50:
+            progress_logs = progress_logs[-50:]
+    try:
+        session["progress"] = progress
+        session["progress_logs"] = progress_logs[:]
+    except Exception:
+        pass
 
 
 def login_required(view_func):
@@ -496,14 +522,13 @@ def save_selection():
     ws_corrected["D1"] = "類似度"
     ws_corrected["E1"] = "判定"
 
-    global progress
-    progress = 0
+    reset_progress_state()
+    update_progress_state(0, "OCR処理を開始します…")
 
     for i in range(rows):
 
-        progress = int(
-            (i + 1) / rows * 100
-        )
+        percent = int((i + 1) / rows * 100)
+        update_progress_state(percent, f"{i + 1}/{rows} 行目を処理中…")
 
         y1 = int(
             top +
@@ -559,9 +584,11 @@ def save_selection():
             ws_corrected.cell(row=i + 2, column=2).fill = yellow
             ws_corrected.cell(row=i + 2, column=3).fill = yellow
 
-        print(
-            f"{i+1}: {text} → {corrected} ({status})"
-        )
+        summary = f"{i + 1}: {text[:40] + ('…' if len(text) > 40 else '')} → {corrected} ({status})"
+        update_progress_state(percent, summary)
+        print(summary)
+
+    update_progress_state(100, "OCR処理が完了しました。")
 
     excel_path = os.path.join(
         EXCEL_FOLDER,
@@ -578,9 +605,12 @@ def save_selection():
 @app.route("/progress")
 @login_required
 def get_progress():
+    progress_value = session.get("progress", progress)
+    logs = session.get("progress_logs", progress_logs)
 
     return jsonify({
-        "progress": progress
+        "progress": progress_value,
+        "logs": logs
     })
 
 @app.route(
