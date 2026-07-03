@@ -10,6 +10,7 @@ from flask import url_for
 from flask import session
 
 import fitz
+import io
 import json
 import os
 import requests
@@ -26,23 +27,9 @@ app.config["SECRET_KEY"] = os.environ.get("FLASK_SECRET_KEY") or os.urandom(24)
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 UPLOAD_FOLDER = os.path.join(BASE_DIR, "uploads")
-PDF_FOLDER = os.path.join(BASE_DIR, "static", "pdf")
-EXCEL_FOLDER = os.path.join(BASE_DIR, "excel")
 
-os.makedirs(
-    UPLOAD_FOLDER,
-    exist_ok=True
-)
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
-os.makedirs(
-    PDF_FOLDER,
-    exist_ok=True
-)
-
-os.makedirs(
-    EXCEL_FOLDER,
-    exist_ok=True
-)
 
 # ==================================================
 # RapidFuzz補正設定
@@ -187,7 +174,8 @@ def get_reader():
         )
     return reader
 
-current_image_path = None
+current_image_bytes = None
+current_excel_bytes = None
 current_pdf_path = None
 current_pdf_page_count = 0
 current_pdf_page_number = 0
@@ -362,7 +350,7 @@ def index():
 @login_required
 def upload():
 
-    global current_image_path
+    global current_image_bytes
     global current_pdf_path
     global current_pdf_page_count
     global current_pdf_page_number
@@ -386,16 +374,10 @@ def upload():
             matrix=fitz.Matrix(3, 3)
         )
 
-        image_path = os.path.join(
-            PDF_FOLDER,
-            "page.png"
-        )
-
-        pix.save(image_path)
-        current_image_path = image_path
+        current_image_bytes = pix.tobytes("png")
 
     return jsonify({
-        "image": "/static/pdf/page.png",
+        "image": "/page.png",
         "total_pages": current_pdf_page_count
     })
 
@@ -407,7 +389,7 @@ def upload():
 @login_required
 def change_page():
 
-    global current_image_path
+    global current_image_bytes
     global current_pdf_path
     global current_pdf_page_number
     global current_pdf_page_count
@@ -433,16 +415,10 @@ def change_page():
             matrix=fitz.Matrix(3, 3)
         )
 
-        image_path = os.path.join(
-            PDF_FOLDER,
-            "page.png"
-        )
-
-        pix.save(image_path)
-        current_image_path = image_path
+        current_image_bytes = pix.tobytes("png")
 
     return jsonify({
-        "image": "/static/pdf/page.png",
+        "image": "/page.png",
         "current_page": current_pdf_page_number + 1,
         "total_pages": current_pdf_page_count
     })
@@ -455,7 +431,8 @@ def change_page():
 @login_required
 def save_selection():
 
-    global current_image_path
+    global current_image_bytes
+    global current_excel_bytes
 
     from PIL import Image
     import numpy as np
@@ -471,9 +448,10 @@ def save_selection():
 
     rows = int(data["rows"])
 
-    img = Image.open(
-        current_image_path
-    )
+    if not current_image_bytes:
+        return jsonify({"error": "画像データがありません"}), 400
+
+    img = Image.open(io.BytesIO(current_image_bytes))
 
     width = right - left
     height = bottom - top
@@ -563,12 +541,10 @@ def save_selection():
             f"{i+1}: {text} → {corrected} ({status})"
         )
 
-    excel_path = os.path.join(
-        EXCEL_FOLDER,
-        "ocr_result.xlsx"
-    )
-
-    wb.save(excel_path)
+    excel_buffer = io.BytesIO()
+    wb.save(excel_buffer)
+    excel_buffer.seek(0)
+    current_excel_bytes = excel_buffer.getvalue()
 
     return jsonify({
         "status": "ok",
@@ -583,15 +559,32 @@ def get_progress():
         "progress": progress
     })
 
+@app.route("/page.png")
+@login_required
+def serve_page_image():
+    if not current_image_bytes:
+        return jsonify({"error": "画像データがありません"}), 404
+
+    return send_file(
+        io.BytesIO(current_image_bytes),
+        mimetype="image/png",
+        download_name="page.png"
+    )
+
+
 @app.route(
     "/download_excel"
 )
 @login_required
 def download_excel():
+    if not current_excel_bytes:
+        return jsonify({"error": "Excelデータがありません"}), 404
 
     return send_file(
-        "excel/ocr_result.xlsx",
-        as_attachment=True
+        io.BytesIO(current_excel_bytes),
+        as_attachment=True,
+        download_name="ocr_result.xlsx",
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
 
 
