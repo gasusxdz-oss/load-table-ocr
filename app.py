@@ -12,17 +12,11 @@ from flask import session
 import fitz
 import json
 import os
-import easyocr
-import numpy as np
-import pandas as pd
 import requests
-
-from dotenv import load_dotenv
-from PIL import Image
-from openpyxl import Workbook
-from openpyxl.styles import PatternFill
 from rapidfuzz import process
 from rapidfuzz import fuzz
+
+from dotenv import load_dotenv
 
 
 load_dotenv()
@@ -178,6 +172,8 @@ reader = None
 def get_reader():
     global reader
     if reader is None:
+        import easyocr
+
         reader = easyocr.Reader(
             ['ja', 'en'],
             gpu=False,
@@ -186,12 +182,8 @@ def get_reader():
         )
     return reader
 
-# 起動時に辞書を読み込む
-load_equipment_dict()
-
 current_image_path = None
 current_pdf_path = None
-current_pdf_doc = None
 current_pdf_page_count = 0
 current_pdf_page_number = 0
 progress = 0
@@ -211,8 +203,15 @@ def login_required(view_func):
 
 def normalize(text):
     """テキストの正規化"""
-    if pd.isna(text):
+    if text is None:
         return ""
+
+    try:
+        import math
+        if isinstance(text, float) and math.isnan(text):
+            return ""
+    except Exception:
+        pass
     
     text = str(text)
     
@@ -249,7 +248,9 @@ def correct_equipment_name(original):
     """
     
     if not DICT_LOADED:
-        return original, 0, "未補正"
+        load_equipment_dict()
+        if not DICT_LOADED:
+            return original, 0, "未補正"
     
     original = str(original).strip()
     corrected = original
@@ -358,7 +359,6 @@ def upload():
 
     global current_image_path
     global current_pdf_path
-    global current_pdf_doc
     global current_pdf_page_count
     global current_pdf_page_number
 
@@ -371,27 +371,23 @@ def upload():
 
     file.save(pdf_path)
 
-    doc = fitz.open(pdf_path)
+    with fitz.open(pdf_path) as doc:
+        current_pdf_path = pdf_path
+        current_pdf_page_count = len(doc)
+        current_pdf_page_number = 0
 
-    current_pdf_path = pdf_path
-    current_pdf_doc = doc
-    current_pdf_page_count = len(doc)
-    current_pdf_page_number = 0
+        page = doc[0]
+        pix = page.get_pixmap(
+            matrix=fitz.Matrix(3, 3)
+        )
 
-    page = doc[0]
+        image_path = os.path.join(
+            PDF_FOLDER,
+            "page.png"
+        )
 
-    pix = page.get_pixmap(
-        matrix=fitz.Matrix(10, 10)
-    )
-
-    image_path = os.path.join(
-        PDF_FOLDER,
-        "page.png"
-    )
-
-    pix.save(image_path)
-
-    current_image_path = image_path
+        pix.save(image_path)
+        current_image_path = image_path
 
     return jsonify({
         "image": "/static/pdf/page.png",
@@ -407,10 +403,11 @@ def upload():
 def change_page():
 
     global current_image_path
-    global current_pdf_doc
+    global current_pdf_path
     global current_pdf_page_number
+    global current_pdf_page_count
 
-    if current_pdf_doc is None:
+    if not current_pdf_path or not os.path.exists(current_pdf_path):
         return jsonify({
             "error": "PDFが読み込まれていません"
         }), 400
@@ -418,32 +415,31 @@ def change_page():
     data = request.json
     page_number = int(data["page"])
 
-    if page_number < 0 or page_number >= len(current_pdf_doc):
+    if page_number < 0 or page_number >= current_pdf_page_count:
         return jsonify({
             "error": "ページ番号が無効です"
         }), 400
 
     current_pdf_page_number = page_number
 
-    page = current_pdf_doc[page_number]
+    with fitz.open(current_pdf_path) as doc:
+        page = doc[page_number]
+        pix = page.get_pixmap(
+            matrix=fitz.Matrix(3, 3)
+        )
 
-    pix = page.get_pixmap(
-        matrix=fitz.Matrix(10, 10)
-    )
+        image_path = os.path.join(
+            PDF_FOLDER,
+            "page.png"
+        )
 
-    image_path = os.path.join(
-        PDF_FOLDER,
-        "page.png"
-    )
-
-    pix.save(image_path)
-
-    current_image_path = image_path
+        pix.save(image_path)
+        current_image_path = image_path
 
     return jsonify({
         "image": "/static/pdf/page.png",
         "current_page": current_pdf_page_number + 1,
-        "total_pages": len(current_pdf_doc)
+        "total_pages": current_pdf_page_count
     })
 
 
@@ -455,6 +451,11 @@ def change_page():
 def save_selection():
 
     global current_image_path
+
+    from PIL import Image
+    import numpy as np
+    from openpyxl import Workbook
+    from openpyxl.styles import PatternFill
 
     data = request.json
 
@@ -492,8 +493,6 @@ def save_selection():
 
     global progress
     progress = 0
-    
-    ocr_results = []
 
     for i in range(rows):
 
@@ -520,14 +519,7 @@ def save_selection():
             )
         )
 
-        crop.save(
-            os.path.join(
-                PDF_FOLDER,
-                f"temp_crop_{i}.png"
-            )
-        )
-
-        crop_np = np.array(crop)
+        crop_np = np.asarray(crop)
 
         ocr_reader = get_reader()
         result = ocr_reader.readtext(
