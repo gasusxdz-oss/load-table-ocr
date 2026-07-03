@@ -10,10 +10,8 @@ from flask import url_for
 from flask import session
 
 import fitz
-import io
 import json
 import os
-import tempfile
 import requests
 from rapidfuzz import process
 from rapidfuzz import fuzz
@@ -28,11 +26,23 @@ app.config["SECRET_KEY"] = os.environ.get("FLASK_SECRET_KEY") or os.urandom(24)
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 UPLOAD_FOLDER = os.path.join(BASE_DIR, "uploads")
-TEMP_FOLDER = os.path.join(BASE_DIR, "tmp")
+PDF_FOLDER = os.path.join(BASE_DIR, "static", "pdf")
+EXCEL_FOLDER = os.path.join(BASE_DIR, "excel")
 
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-os.makedirs(TEMP_FOLDER, exist_ok=True)
+os.makedirs(
+    UPLOAD_FOLDER,
+    exist_ok=True
+)
 
+os.makedirs(
+    PDF_FOLDER,
+    exist_ok=True
+)
+
+os.makedirs(
+    EXCEL_FOLDER,
+    exist_ok=True
+)
 
 # ==================================================
 # RapidFuzz補正設定
@@ -177,10 +187,7 @@ def get_reader():
         )
     return reader
 
-current_image_bytes = None
 current_image_path = None
-current_excel_bytes = None
-current_excel_path = None
 current_pdf_path = None
 current_pdf_page_count = 0
 current_pdf_page_number = 0
@@ -355,7 +362,6 @@ def index():
 @login_required
 def upload():
 
-    global current_image_bytes
     global current_image_path
     global current_pdf_path
     global current_pdf_page_count
@@ -380,16 +386,16 @@ def upload():
             matrix=fitz.Matrix(3, 3)
         )
 
-        with tempfile.NamedTemporaryFile(suffix=".png", dir=TEMP_FOLDER, delete=False) as tmp:
-            image_path = tmp.name
+        image_path = os.path.join(
+            PDF_FOLDER,
+            "page.png"
+        )
 
         pix.save(image_path)
-        current_image_bytes = pix.tobytes("png")
         current_image_path = image_path
-        session["image_path"] = image_path
 
     return jsonify({
-        "image": "/page.png",
+        "image": "/static/pdf/page.png",
         "total_pages": current_pdf_page_count
     })
 
@@ -401,7 +407,6 @@ def upload():
 @login_required
 def change_page():
 
-    global current_image_bytes
     global current_image_path
     global current_pdf_path
     global current_pdf_page_number
@@ -428,16 +433,16 @@ def change_page():
             matrix=fitz.Matrix(3, 3)
         )
 
-        with tempfile.NamedTemporaryFile(suffix=".png", dir=TEMP_FOLDER, delete=False) as tmp:
-            image_path = tmp.name
+        image_path = os.path.join(
+            PDF_FOLDER,
+            "page.png"
+        )
 
         pix.save(image_path)
-        current_image_bytes = pix.tobytes("png")
         current_image_path = image_path
-        session["image_path"] = image_path
 
     return jsonify({
-        "image": "/page.png",
+        "image": "/static/pdf/page.png",
         "current_page": current_pdf_page_number + 1,
         "total_pages": current_pdf_page_count
     })
@@ -450,9 +455,7 @@ def change_page():
 @login_required
 def save_selection():
 
-    global current_image_bytes
-    global current_excel_bytes
-    global current_excel_path
+    global current_image_path
 
     from PIL import Image
     import numpy as np
@@ -468,10 +471,9 @@ def save_selection():
 
     rows = int(data["rows"])
 
-    if not current_image_bytes:
-        return jsonify({"error": "画像データがありません"}), 400
-
-    img = Image.open(io.BytesIO(current_image_bytes))
+    img = Image.open(
+        current_image_path
+    )
 
     width = right - left
     height = bottom - top
@@ -561,12 +563,12 @@ def save_selection():
             f"{i+1}: {text} → {corrected} ({status})"
         )
 
-    with tempfile.NamedTemporaryFile(suffix=".xlsx", dir=TEMP_FOLDER, delete=False) as tmp:
-        excel_path = tmp.name
+    excel_path = os.path.join(
+        EXCEL_FOLDER,
+        "ocr_result.xlsx"
+    )
 
     wb.save(excel_path)
-    current_excel_path = excel_path
-    session["excel_path"] = excel_path
 
     return jsonify({
         "status": "ok",
@@ -581,34 +583,15 @@ def get_progress():
         "progress": progress
     })
 
-@app.route("/page.png")
-@login_required
-def serve_page_image():
-    image_path = session.get("image_path") or current_image_path
-    if not image_path or not os.path.exists(image_path):
-        return jsonify({"error": "画像データがありません"}), 404
-
-    return send_file(
-        image_path,
-        mimetype="image/png",
-        download_name="page.png"
-    )
-
-
 @app.route(
     "/download_excel"
 )
 @login_required
 def download_excel():
-    excel_path = session.get("excel_path") or current_excel_path
-    if not excel_path or not os.path.exists(excel_path):
-        return jsonify({"error": "Excelデータがありません"}), 404
 
     return send_file(
-        excel_path,
-        as_attachment=True,
-        download_name="ocr_result.xlsx",
-        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        "excel/ocr_result.xlsx",
+        as_attachment=True
     )
 
 
