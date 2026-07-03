@@ -13,6 +13,7 @@ import fitz
 import io
 import json
 import os
+import tempfile
 import requests
 from rapidfuzz import process
 from rapidfuzz import fuzz
@@ -27,8 +28,10 @@ app.config["SECRET_KEY"] = os.environ.get("FLASK_SECRET_KEY") or os.urandom(24)
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 UPLOAD_FOLDER = os.path.join(BASE_DIR, "uploads")
+TEMP_FOLDER = os.path.join(BASE_DIR, "tmp")
 
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+os.makedirs(TEMP_FOLDER, exist_ok=True)
 
 
 # ==================================================
@@ -175,7 +178,9 @@ def get_reader():
     return reader
 
 current_image_bytes = None
+current_image_path = None
 current_excel_bytes = None
+current_excel_path = None
 current_pdf_path = None
 current_pdf_page_count = 0
 current_pdf_page_number = 0
@@ -351,6 +356,7 @@ def index():
 def upload():
 
     global current_image_bytes
+    global current_image_path
     global current_pdf_path
     global current_pdf_page_count
     global current_pdf_page_number
@@ -374,7 +380,13 @@ def upload():
             matrix=fitz.Matrix(3, 3)
         )
 
+        with tempfile.NamedTemporaryFile(suffix=".png", dir=TEMP_FOLDER, delete=False) as tmp:
+            image_path = tmp.name
+
+        pix.save(image_path)
         current_image_bytes = pix.tobytes("png")
+        current_image_path = image_path
+        session["image_path"] = image_path
 
     return jsonify({
         "image": "/page.png",
@@ -390,6 +402,7 @@ def upload():
 def change_page():
 
     global current_image_bytes
+    global current_image_path
     global current_pdf_path
     global current_pdf_page_number
     global current_pdf_page_count
@@ -415,7 +428,13 @@ def change_page():
             matrix=fitz.Matrix(3, 3)
         )
 
+        with tempfile.NamedTemporaryFile(suffix=".png", dir=TEMP_FOLDER, delete=False) as tmp:
+            image_path = tmp.name
+
+        pix.save(image_path)
         current_image_bytes = pix.tobytes("png")
+        current_image_path = image_path
+        session["image_path"] = image_path
 
     return jsonify({
         "image": "/page.png",
@@ -433,6 +452,7 @@ def save_selection():
 
     global current_image_bytes
     global current_excel_bytes
+    global current_excel_path
 
     from PIL import Image
     import numpy as np
@@ -541,10 +561,12 @@ def save_selection():
             f"{i+1}: {text} → {corrected} ({status})"
         )
 
-    excel_buffer = io.BytesIO()
-    wb.save(excel_buffer)
-    excel_buffer.seek(0)
-    current_excel_bytes = excel_buffer.getvalue()
+    with tempfile.NamedTemporaryFile(suffix=".xlsx", dir=TEMP_FOLDER, delete=False) as tmp:
+        excel_path = tmp.name
+
+    wb.save(excel_path)
+    current_excel_path = excel_path
+    session["excel_path"] = excel_path
 
     return jsonify({
         "status": "ok",
@@ -562,11 +584,12 @@ def get_progress():
 @app.route("/page.png")
 @login_required
 def serve_page_image():
-    if not current_image_bytes:
+    image_path = session.get("image_path") or current_image_path
+    if not image_path or not os.path.exists(image_path):
         return jsonify({"error": "画像データがありません"}), 404
 
     return send_file(
-        io.BytesIO(current_image_bytes),
+        image_path,
         mimetype="image/png",
         download_name="page.png"
     )
@@ -577,11 +600,12 @@ def serve_page_image():
 )
 @login_required
 def download_excel():
-    if not current_excel_bytes:
+    excel_path = session.get("excel_path") or current_excel_path
+    if not excel_path or not os.path.exists(excel_path):
         return jsonify({"error": "Excelデータがありません"}), 404
 
     return send_file(
-        io.BytesIO(current_excel_bytes),
+        excel_path,
         as_attachment=True,
         download_name="ocr_result.xlsx",
         mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
